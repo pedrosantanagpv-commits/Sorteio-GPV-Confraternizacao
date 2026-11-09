@@ -90,7 +90,14 @@ function Dashboard({state,navigate,stats,remaining,active}){const next=state.pri
 function Modal({title,description,onClose,children}){return <div className="modal-shade" onMouseDown={e=>{if(e.target===e.currentTarget)onClose()}}><div className="modal"><div className="modal-header"><div><h3>{title}</h3>{description&&<p>{description}</p>}</div><button className="icon-button" onClick={onClose}><X size={19}/></button></div>{children}</div></div>}
 function Participants({state,mutate,notice,wonIds,active}){
  const [query,setQuery]=useState('');const [filter,setFilter]=useState('todos');const [modal,setModal]=useState(null);const [form,setForm]=useState({name:'',sector:'',code:''});const [importRows,setImportRows]=useState(null);const [importName,setImportName]=useState('');const [importError,setImportError]=useState('');
- const list=state.participants.filter(p=>(normalize(`${p.name} ${p.sector} ${p.code}`).includes(normalize(query)))&&(filter==='todos'||(filter==='elegiveis'&&p.active&&!wonIds.has(p.id))||(filter==='premiados'&&wonIds.has(p.id))||(filter==='inativos'&&!p.active));
+ const list=state.participants.filter(p => {
+  const matchesSearch = normalize(`${p.name} ${p.sector} ${p.code}`).includes(normalize(query));
+  const matchesFilter = filter === 'todos' ||
+    (filter === 'elegiveis' && p.active && !wonIds.has(p.id)) ||
+    (filter === 'premiados' && wonIds.has(p.id)) ||
+    (filter === 'inativos' && !p.active);
+  return matchesSearch && matchesFilter;
+ });
  const openForm=(p)=>{setForm(p?{...p}:{name:'',sector:'',code:''});setModal('form')};
  const save=()=>{if(!form.name.trim()){notice('Informe o nome do participante.');return}const code=normalize(form.code),name=normalize(form.name),sector=normalize(form.sector);if(state.participants.some(p=>p.id!==form.id&&((code&&normalize(p.code)===code)||(!code&&!p.code&&normalize(p.name)===name&&normalize(p.sector)===sector)))){notice('Participante duplicado: confira nome ou matrícula.');return}
   mutate(s=>({...s,participants:form.id?s.participants.map(p=>p.id===form.id?{...p,...form,name:form.name.trim(),sector:form.sector.trim(),code:form.code.trim()}:p):[...s.participants,{id:crypto.randomUUID(),name:form.name.trim(),sector:form.sector.trim(),code:form.code.trim(),active:true}]}));setModal(null);notice('Participante salvo com sucesso.')};
