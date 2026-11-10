@@ -4,84 +4,97 @@ import {LayoutDashboard,Users,Gift,Shuffle,History,Settings,ExternalLink,Monitor
 import Papa from 'papaparse';
 import {STORAGE_KEY,demoState,normalize,randomIndex,formatTime,toCSV,downloadText} from './data';
 import './styles.css';
+import {onAuthStateChanged,signInWithEmailAndPassword,signOut} from 'firebase/auth';
+import {onSnapshot,doc} from 'firebase/firestore';
+import {auth,db,configured,eventId,freshState,sendAction} from './firebase';
 
 const links=[['/admin',LayoutDashboard,'Dashboard'],['/admin/participantes',Users,'Participantes'],['/admin/premios',Gift,'Prêmios'],['/admin/sorteio',Shuffle,'Sorteio ao vivo'],['/admin/historico',History,'Histórico'],['/admin/configuracoes',Settings,'Configurações']];
 const phases={idle:'Aguardando',spinning:'Sorteando',candidate:'Validando presença',confirmed:'Ganhador confirmado'};
-function getInitial(){try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY));if(s&&Array.isArray(s.participants)&&Array.isArray(s.prizes)&&Array.isArray(s.winners)&&s.live)return s;}catch{}return demoState()}
 function App(){
- const [state,setState]=useState(getInitial);const stateRef=useRef(state);stateRef.current=state;
  const [route,setRoute]=useState(location.pathname==='/'?'/admin':location.pathname);
- const [sidebar,setSidebar]=useState(false);const [toast,setToast]=useState('');
- const broadcast=useRef(null);const lastUpdated=useRef(state.updatedAt||0);
- useEffect(()=>{try{broadcast.current=new BroadcastChannel('gpv-sorteios-2026');broadcast.current.onmessage=e=>{if(e.data?.updatedAt>lastUpdated.current){lastUpdated.current=e.data.updatedAt;stateRef.current=e.data;setState(e.data)}}}catch{};
- const onStorage=e=>{if(e.key===STORAGE_KEY&&e.newValue){try{const s=JSON.parse(e.newValue);if(s.updatedAt>lastUpdated.current){lastUpdated.current=s.updatedAt;stateRef.current=s;setState(s)}}catch{}}};
- window.addEventListener('storage',onStorage);return()=>{broadcast.current?.close();window.removeEventListener('storage',onStorage)}},[]);
- const mutate=useCallback((fn)=>{const prior=stateRef.current;const next=fn(prior);if(next===prior)return;next.updatedAt=Math.max(Date.now(),lastUpdated.current+1);lastUpdated.current=next.updatedAt;stateRef.current=next;setState(next);try{localStorage.setItem(STORAGE_KEY,JSON.stringify(next))}catch{setToast('Armazenamento local cheio. Exporte seus dados.')}broadcast.current?.postMessage(next)},[]);
+ const [sidebar,setSidebar]=useState(false),[toast,setToast]=useState('');
+ const [user,setUser]=useState(undefined),[state,setState]=useState(freshState),[publicState,setPublicState]=useState(null);
+ const [authError,setAuthError]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[logging,setLogging]=useState(false),[loading,setLoading]=useState(true);
+ const stateRef=useRef(state);stateRef.current=state;
+ const isTel=route.startsWith('/telao');
+ const notice=(m)=>setToast(m);
+ useEffect(()=>{if(!auth){setUser(null);return}return onAuthStateChanged(auth,setUser,()=>setUser(null))},[]);
+ useEffect(()=>{if(!configured||!db)return;return onSnapshot(doc(db,'events',eventId,'screen','live'),snap=>setPublicState(snap.exists()?snap.data():null),e=>{if(isTel)setAuthError('Sem acesso ao telão: '+e.message)})},[isTel]);
+ useEffect(()=>{
+  if(!user||!db){setLoading(false);return}
+  let active=true;let unsub=()=>{};setLoading(true);
+  (async()=>{
+   try{await sendAction('init');if(!active)return;
+    unsub=onSnapshot(doc(db,'events',eventId,'state','current'),snap=>{if(snap.exists()){setState(snap.data());setLoading(false)}},e=>{setAuthError('Firestore: '+e.message);setLoading(false)});
+   }catch(e){if(active){setAuthError(e.message);setLoading(false)}}
+  })();return()=>{active=false;unsub()};
+ },[user]);
  useEffect(()=>{const handler=()=>setRoute(location.pathname==='/'?'/admin':location.pathname);window.addEventListener('popstate',handler);return()=>window.removeEventListener('popstate',handler)},[]);
- useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),4500);return()=>clearTimeout(t)},[toast]);
- const navigate=(target)=>{history.pushState({},'',target);setRoute(target);setSidebar(false);window.scrollTo(0,0)};
+ useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),5000);return()=>clearTimeout(t)},[toast]);
+ const navigate=target=>{history.pushState({},'',target);setRoute(target);setSidebar(false);window.scrollTo(0,0)};
+ const action=async(type,payload={})=>{try{await sendAction(type,payload);return true}catch(e){notice(e.message);return false}};
+ const mutate=useCallback(fn=>{
+  const old=stateRef.current,next=fn(old);if(next===old)return;
+  const peopleChange=JSON.stringify(next.participants)!==JSON.stringify(old.participants);
+  const prizeChange=JSON.stringify(next.prizes)!==JSON.stringify(old.prizes);
+  if(peopleChange&&!prizeChange)action('setParticipants',{participants:next.participants});
+  else if(prizeChange&&!peopleChange)action('setPrizes',{prizes:next.prizes});
+  else notice('Operação indisponível. Use os controles oficiais do sorteio.');
+ },[]);
  const wonIds=useMemo(()=>new Set(state.winners.map(w=>w.participantId)),[state.winners]);
  const active=state.participants.filter(p=>p.active&&!wonIds.has(p.id));
- const remaining=(prize)=>Math.max(0,prize.quantity-state.winners.filter(w=>w.prizeId===prize.id).length);
+ const remaining=p=>Math.max(0,p.quantity-state.winners.filter(w=>w.prizeId===p.id).length);
  const prizesRemaining=state.prizes.reduce((n,p)=>n+(p.active?remaining(p):0),0);
- const notice=(message)=>setToast(message);
  const currentPrize=state.prizes.find(p=>p.id===state.live.prizeId);
  const selected=state.participants.find(p=>p.id===state.live.candidateId);
  const eligibility=active.filter(p=>!state.live.exclusions.includes(p.id));
- const choosePrize=id=>mutate(s=>({...s,live:{phase:'idle',prizeId:id,candidateId:null,exclusions:[],attempt:0,startedAt:null}}));
- const beginDraw=()=>{
-  const s=stateRef.current;
-  if(s.live.phase!=='idle'&&s.live.phase!=='candidate')return;
-  const prize=s.prizes.find(p=>p.id===s.live.prizeId);
-  if(!prize||!prize.active||s.winners.filter(w=>w.prizeId===prize.id).length>=prize.quantity){notice('Selecione um prêmio com unidades disponíveis.');return}
-  const already=new Set(s.winners.map(w=>w.participantId));
-  const pool=s.participants.filter(p=>p.active&&!already.has(p.id)&&!s.live.exclusions.includes(p.id));
-  if(!pool.length){notice('Não há mais participantes elegíveis nesta rodada.');return}
-  const chosen=pool[randomIndex(pool.length)];
-  mutate(current=>({...current,live:{...current.live,phase:'spinning',candidateId:chosen.id,attempt:current.live.attempt+1,startedAt:Date.now()}}));
- };
- useEffect(()=>{if(state.live.phase!=='spinning')return;const delay=Math.max(0,4500-(Date.now()-state.live.startedAt));const timeout=setTimeout(()=>mutate(s=>s.live.phase==='spinning'?({...s,live:{...s.live,phase:'candidate'}}):s),delay);return()=>clearTimeout(timeout)},[state.live.phase,state.live.startedAt,mutate]);
- const reject=()=>mutate(s=>s.live.phase!=='candidate'?s:({...s,live:{...s.live,phase:'idle',candidateId:null,startedAt:null,exclusions:[...new Set([...s.live.exclusions,s.live.candidateId])]}}));
- const confirm=()=>mutate(s=>{
-  if(s.live.phase!=='candidate')return s;
-  const p=s.participants.find(p=>p.id===s.live.candidateId),pr=s.prizes.find(pr=>pr.id===s.live.prizeId);
-  if(!p||!p.active||s.winners.some(w=>w.participantId===p.id)||!pr||!pr.active||s.winners.filter(w=>w.prizeId===pr.id).length>=pr.quantity)return s;
-  return {...s,winners:[...s.winners,{id:crypto.randomUUID(),participantId:p.id,participantName:p.name,prizeId:pr.id,prizeName:pr.name,createdAt:Date.now(),operator:'Operador (demo)',attempt:s.live.attempt}],live:{...s.live,phase:'confirmed'}}
- });
- const finish=()=>mutate(s=>({...s,live:{phase:'idle',prizeId:s.prizes.find(p=>p.active&&s.winners.filter(w=>w.prizeId===p.id).length<p.quantity)?.id||'',candidateId:null,exclusions:[],attempt:0,startedAt:null}}));
- const isTel=route.startsWith('/telao');
+ const choosePrize=id=>action('select',{id});
+ const beginDraw=()=>action('draw');
+ useEffect(()=>{
+  if(!user||state.live.phase!=='spinning')return;
+  const delay=Math.max(0,4600-(Date.now()-(state.live.startedAt||Date.now())));
+  const timeout=setTimeout(()=>action('reveal'),delay);
+  return()=>clearTimeout(timeout);
+ },[user,state.live.phase,state.live.startedAt]);
+ const reject=()=>action('reject'),confirm=()=>action('confirm'),finish=()=>action('finish');
  const stats=[{label:'Participantes',value:state.participants.length,icon:Users},{label:'Elegíveis',value:active.length,icon:ShieldCheck},{label:'Prêmios restantes',value:prizesRemaining,icon:Gift},{label:'Ganhadores',value:state.winners.length,icon:PartyPopper}];
  const common={state,mutate,notice,navigate,wonIds,remaining,active,prizesRemaining};
- if(isTel)return <Telon state={state} selected={selected} prize={currentPrize} onExit={()=>navigate('/admin')} />;
+ if(isTel){
+  const live=publicState?{phase:publicState.phase,prizeId:'public',candidateId:publicState.candidate?.name||null,exclusions:[],attempt:publicState.attempt||0,startedAt:publicState.startedAt}:freshState().live;
+  const safeState={participants:[],winners:[],live};
+  return <Telon state={safeState} selected={publicState?.candidate||null} prize={publicState?.prize||null} onExit={()=>navigate('/admin')}/>;
+ }
+ if(!configured)return <div className="login-stage"><div className="login-box"><div className="login-logo">GPV <span>SORTEIOS</span></div><h1>Firebase não configurado</h1><p>Adicione as variáveis VITE_FIREBASE_* no projeto da Vercel e publique novamente.</p></div></div>;
+ const doLogin=async e=>{e.preventDefault();setLogging(true);setAuthError('');try{await signInWithEmailAndPassword(auth,email.trim(),password)}catch(e){setAuthError('E-mail ou senha inválidos, ou login não autorizado.')}finally{setLogging(false)}};
+ if(user===undefined||loading&&user)return <div className="login-stage"><div className="login-box"><div className="login-logo">GPV <span>SORTEIOS</span></div><h2>Conectando ao evento...</h2>{authError&&<p className="login-error">{authError}</p>}</div></div>;
+ if(!user)return <div className="login-stage"><form className="login-box" onSubmit={doLogin}><div className="login-logo">GPV <span>SORTEIOS</span></div><small>CONFRATERNIZAÇÃO 2026</small><h1>Acesso do operador</h1><p>Entre com o usuário autorizado no Firebase Authentication.</p><label>E-mail<input type="email" required autoComplete="username" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com"/></label><label>Senha<input type="password" required autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Sua senha"/></label>{authError&&<div className="login-error">{authError}</div>}<button className="button button-primary button-large" disabled={logging}>{logging?'Entrando...':'ENTRAR NO PAINEL'} <ArrowRight size={18}/></button></form></div>;
+ if(authError)return <div className="login-stage"><div className="login-box"><h2>Configuração pendente</h2><p className="login-error">{authError}</p><p>Confira GPV_ADMIN_UID, FIREBASE_SERVICE_ACCOUNT_JSON e as regras do Firestore.</p><button className="button button-outline" onClick={()=>signOut(auth)}>Sair</button></div></div>;
  return <div className="app-shell">
   {sidebar&&<div className="mobile-overlay" onClick={()=>setSidebar(false)} />}
   <aside className={'sidebar '+(sidebar?'open':'')}>
-    <div className="brand"><div className="brand-mark">G<span>✦</span></div><div><strong>GPV<span> SORTEIOS</span></strong><small>CONFRATERNIZAÇÃO 2026</small></div></div>
-    <div className="side-caption">MENU PRINCIPAL</div>
-    <nav>{links.map(([href,Icon,label])=><button key={href} className={'nav-link '+(route===href?'active':'')} onClick={()=>navigate(href)}><Icon size={18}/><span>{label}</span>{route===href&&<span className="active-dot"/>}</button>)}</nav>
-    <div className="sidebar-bottom"><div className="side-promo"><Sparkles size={20}/><strong>É tempo de celebrar.</strong><span>Grandes momentos merecem grandes premiações.</span></div><div className="side-footer"><span className="status-dot"/> Modo demonstração <span>v0.1.0</span></div></div>
+   <div className="brand"><div className="brand-mark">G<span>✦</span></div><div><strong>GPV<span> SORTEIOS</span></strong><small>CONFRATERNIZAÇÃO 2026</small></div></div>
+   <div className="side-caption">MENU PRINCIPAL</div>
+   <nav>{links.map(([href,Icon,label])=><button key={href} className={'nav-link '+(route===href?'active':'')} onClick={()=>navigate(href)}><Icon size={18}/><span>{label}</span>{route===href&&<span className="active-dot"/>}</button>)}</nav>
+   <div className="sidebar-bottom"><div className="side-promo"><Sparkles size={20}/><strong>É tempo de celebrar.</strong><span>Grandes momentos merecem grandes premiações.</span></div><div className="side-footer"><span className="status-dot"/> Firebase conectado <span>v0.2.0</span></div></div>
   </aside>
-  <div className="main-side">
-   <header className="topbar"><div className="top-left"><button className="icon-button mobile-menu" onClick={()=>setSidebar(true)}><Menu size={20}/></button><div className="breadcrumb">GPV Sorteios <ChevronRight size={14}/><strong>{links.find(l=>l[0]===route)?.[2]||'Dashboard'}</strong></div></div><div className="header-actions"><span className="demo-indicator"><span className="status-dot"/> DEMO LOCAL</span><button className="button button-outline tel-btn" onClick={()=>window.open('/telao','_blank')}><Monitor size={16}/> Abrir telão <ExternalLink size={14}/></button><div className="avatar">GP</div></div></header>
+  <div className="main-side"><header className="topbar"><div className="top-left"><button className="icon-button mobile-menu" onClick={()=>setSidebar(true)}><Menu size={20}/></button><div className="breadcrumb">GPV Sorteios <ChevronRight size={14}/><strong>{links.find(l=>l[0]===route)?.[2]||'Dashboard'}</strong></div></div><div className="header-actions"><span className="demo-indicator"><span className="status-dot"/> FIREBASE AO VIVO</span><button className="button button-outline tel-btn" onClick={()=>window.open('/telao','_blank')}><Monitor size={16}/> Abrir telão <ExternalLink size={14}/></button><button className="icon-button" title="Sair" onClick={()=>signOut(auth)}><LogOut size={18}/></button><div className="avatar">GP</div></div></header>
    <main className="page">
-    {route==='/admin'||route==='/'?<Dashboard {...common} stats={stats}/>:null}
-    {route==='/admin/participantes'?<Participants {...common}/>:null}
-    {route==='/admin/premios'?<Prizes {...common}/>:null}
-    {route==='/admin/sorteio'?<Draw {...common} prize={currentPrize} selected={selected} eligibility={eligibility} choosePrize={choosePrize} beginDraw={beginDraw} reject={reject} confirm={confirm} finish={finish}/>:null}
-    {route==='/admin/historico'?<HistoryPage {...common}/>:null}
-    {route==='/admin/configuracoes'?<Preferences {...common}/>:null}
-    {!links.some(l=>l[0]===route)&&route!=='/'?<Dashboard {...common} stats={stats}/>:null}
-   </main>
-   <footer className="app-footer">GPV ASSOCIADOS <span>•</span> Sorteios 2026 <span>•</span> Interface demonstrativa v0.1.0</footer>
-  </div>
-  {toast&&<div className="toast"><Info size={17}/>{toast}<button onClick={()=>setToast('')}><X size={15}/></button></div>}
- </div>
+    {(route==='/admin'||route==='/')&&<Dashboard {...common} stats={stats}/>}
+    {route==='/admin/participantes'&&<Participants {...common}/>}
+    {route==='/admin/premios'&&<Prizes {...common}/>}
+    {route==='/admin/sorteio'&&<Draw {...common} prize={currentPrize} selected={selected} eligibility={eligibility} choosePrize={choosePrize} beginDraw={beginDraw} reject={reject} confirm={confirm} finish={finish}/>}
+    {route==='/admin/historico'&&<HistoryPage {...common}/>}
+    {route==='/admin/configuracoes'&&<Preferences {...common}/>}
+    {!links.some(l=>l[0]===route)&&route!=='/'&&<Dashboard {...common} stats={stats}/>}
+   </main><footer className="app-footer">GPV ASSOCIADOS <span>•</span> Sorteios 2026 <span>•</span> Firebase · v0.2.0</footer>
+  </div>{toast&&<div className="toast"><Info size={17}/>{toast}<button onClick={()=>setToast('')}><X size={15}/></button></div>}
+ </div>;
 }
 function PageHeader({eyebrow,title,description,children}){return <div className="page-heading"><div><div className="eyebrow"><span className="tiny-diamond"/> {eyebrow}</div><h1>{title}</h1><p>{description}</p></div>{children&&<div className="heading-actions">{children}</div>}</div>}
 function Stat({item}){const Icon=item.icon;return <div className="stat-card"><div className="stat-top"><span>{item.label}</span><div className="stat-icon"><Icon size={19}/></div></div><strong>{String(item.value).padStart(2,'0')}</strong><div className="stat-detail"><span className="mini-line"/>Atualizado em tempo real*</div></div>}
 function Dashboard({state,navigate,stats,remaining,active}){const next=state.prizes.find(p=>p.active&&remaining(p)>0);const recent=[...state.winners].reverse().slice(0,4);return <>
  <PageHeader eyebrow="VISÃO GERAL" title={<>Bem-vindo ao <em>GPV Sorteios.</em></>} description="Tudo pronto para uma confraternização inesquecível? Acompanhe os números do evento." ><button className="button button-primary" onClick={()=>navigate('/admin/sorteio')}><Shuffle size={17}/> Ir para o sorteio <ArrowRight size={16}/></button></PageHeader>
- <div className="demo-alert"><Info size={18}/><span><b>Ambiente de demonstração.</b> Dados fictícios armazenados somente neste navegador. Integração Firebase será configurada na próxima etapa.</span></div>
+ <div className="demo-alert"><Info size={18}/><span><b>Firebase conectado.</b> Cadastre participantes e prêmios para iniciar a confraternização. O telão está sincronizado em tempo real.</span></div>
  <div className="stats-grid">{stats.map(i=><Stat key={i.label} item={i}/>)}</div>
  <div className="dashboard-grid"><section className="feature-panel"><div className="feature-glow"/><div className="eyebrow light"><Sparkles size={14}/> A NOITE É DE CELEBRAR</div><h2>Uma celebração.<br/><span>Infinitas conquistas.</span></h2><p>Prepare o próximo grande momento. Controle a premiação enquanto o público acompanha tudo no telão.</p><button className="button button-primary" onClick={()=>navigate('/admin/sorteio')}>Iniciar operação <ArrowRight size={17}/></button><div className="feature-watermark">2026</div></section>
  <section className="surface-card next-prize"><div className="card-heading"><div><span className="eyebrow">PRÓXIMA PREMIAÇÃO</span><h3>Prêmio da vez</h3></div><span className="outline-tag">{next?'Disponível':'Concluído'}</span></div>{next?<><div className="prize-art"><span>{next.emoji||'🎁'}</span></div><h3>{next.name}</h3><p>{next.description||'Um presente especial para esta noite.'}</p><div className="prize-meta"><Gift size={15}/>{remaining(next)} {remaining(next)===1?'unidade disponível':'unidades disponíveis'}</div></>:<div className="empty-small">Todos os prêmios foram distribuídos.</div>}</section></div>
@@ -141,10 +154,10 @@ function Draw({state,prize,selected,eligibility,choosePrize,beginDraw,reject,con
  <section className="surface-card session-card"><div className="card-heading"><div><span className="eyebrow">02 / ANDAMENTO</span><h3>Rodada atual</h3></div><span className="round-tag">Tentativa {live.attempt}</span></div><div className="session-line"><span><Users size={16}/> Participantes elegíveis</span><strong>{eligibility.length}</strong></div><div className="session-line"><span><XCircle size={16}/> Ausentes nesta rodada</span><strong>{live.exclusions.length}</strong></div><div className="exclusion-box">{live.exclusions.length?state.participants.filter(p=>live.exclusions.includes(p.id)).map(p=><span key={p.id}>{p.name}</span>):<p>Os participantes ausentes nesta rodada aparecerão aqui. Eles continuam aptos a outros prêmios.</p>}</div></section></div></div>
  {showAbsent&&<Modal title="Participante ausente?" description={`Marcar ${selected?.name||'o participante'} como ausente desta rodada?`} onClose={()=>setShowAbsent(false)}><p className="modal-copy">Ele não será sorteado novamente para <strong>{prize?.name}</strong> nesta rodada, mas continuará elegível para outras premiações.</p><div className="modal-actions"><button className="button button-outline" onClick={()=>setShowAbsent(false)}>Cancelar</button><button className="button button-danger" onClick={()=>{reject();setShowAbsent(false)}}><XCircle size={17}/> Confirmar ausência</button></div></Modal>}
  {showConfirm&&<Modal title="Confirmar ganhador" description="Confira a presença antes de registrar o prêmio." onClose={()=>setShowConfirm(false)}><div className="confirm-summary"><strong>{selected?.name}</strong><span>{prize?.name}</span></div><p className="modal-copy">Após confirmar, o participante não poderá ganhar nenhum outro prêmio.</p><div className="modal-actions"><button className="button button-outline" onClick={()=>setShowConfirm(false)}>Cancelar</button><button className="button button-primary" onClick={()=>{confirm();setShowConfirm(false)}}><CheckCircle2 size={17}/> Confirmar e premiar</button></div></Modal>}</>}
-function HistoryPage({state,notice}){const [query,setQuery]=useState('');const list=[...state.winners].reverse().filter(w=>normalize(w.participantName+' '+w.prizeName).includes(normalize(query)));const exportFile=()=>{if(!state.winners.length){notice('Ainda não há resultados para exportar.');return}downloadText('gpv-sorteios-2026-resultados.csv',toCSV([['Ganhador','Prêmio','Data e hora','Operador','Tentativa'],...state.winners.map(w=>[w.participantName,w.prizeName,formatTime(w.createdAt),w.operator,w.attempt])]))};return <><PageHeader eyebrow="REGISTRO DAS CONQUISTAS" title={<>Histórico de <em>ganhadores.</em></>} description="Cada premiação, um momento para lembrar. Consulte os resultados confirmados."><button className="button button-outline" onClick={exportFile}><Download size={17}/> Exportar CSV</button></PageHeader><div className="history-banner"><div className="history-banner-icon"><PartyPopper size={25}/></div><div><strong>{state.winners.length} {state.winners.length===1?'pessoa premiada':'pessoas premiadas'}</strong><span>Todos os resultados registrados nesta demonstração</span></div></div><section className="surface-card data-card"><div className="data-tools"><div className="search-box"><Search size={18}/><input placeholder="Pesquisar ganhador ou prêmio..." value={query} onChange={e=>setQuery(e.target.value)}/></div></div><div className="table-scroll"><table className="data-table"><thead><tr><th>GANHADOR</th><th>PRÊMIO</th><th>DATA E HORA</th><th>TENTATIVA</th><th>STATUS</th></tr></thead><tbody>{list.map(w=><tr key={w.id}><td><strong>{w.participantName}</strong></td><td className="muted">{w.prizeName}</td><td className="muted">{formatTime(w.createdAt)}</td><td className="muted">{w.attempt}</td><td><span className="status-pill green">Confirmado</span></td></tr>)}</tbody></table>{!list.length&&<div className="empty-table">Nenhum resultado confirmado até agora.</div>}</div><div className="table-bottom">{list.length} resultado(s) encontrado(s)</div></section></>}
-function Preferences({state,mutate,notice}){const [confirmed,setConfirmed]=useState(false);const reset=()=>{mutate(()=>demoState());setConfirmed(false);notice('Dados fictícios restaurados.')};const exportBackup=()=>downloadText('gpv-sorteios-2026-backup-demo.json',JSON.stringify(state,null,2),'application/json');return <><PageHeader eyebrow="PREFERÊNCIAS DA APLICAÇÃO" title={<>Configurações<span className="gold-period">.</span></>} description="Informações sobre o ambiente de demonstração e seus dados."/><div className="settings-stack"><section className="surface-card settings-section"><div className="settings-icon"><Info size={22}/></div><div><h3>Versão 0.1.0 · Demonstração local</h3><p>A aplicação está operando sem Firebase. Os dados ficam salvos exclusivamente neste navegador, e o telão sincroniza apenas entre abas desta mesma origem no mesmo navegador/perfil.</p><div className="info-chips"><span>React + Vite</span><span>Vercel</span><span>Firebase (próxima versão)</span></div></div></section><section className="surface-card settings-section"><div className="settings-icon"><Download size={22}/></div><div><h3>Backup da demonstração</h3><p>Salve uma cópia local dos participantes, prêmios e resultados. Este arquivo JSON é para conferência e não possui importação automática nesta versão.</p><button className="button button-outline" onClick={exportBackup}><Download size={16}/> Exportar backup JSON</button></div></section><section className="surface-card settings-section danger-zone"><div className="settings-icon"><RotateCcw size={22}/></div><div><h3>Restaurar dados fictícios</h3><p>Apaga as alterações locais, os sorteios e os ganhadores desta demonstração, reiniciando os dados de teste.</p>{!confirmed?<button className="button button-danger-outline" onClick={()=>setConfirmed(true)}><RotateCcw size={16}/> Restaurar demonstração</button>:<div className="reset-actions"><strong>Tem certeza? Os dados atuais serão perdidos.</strong><button className="button button-outline" onClick={()=>setConfirmed(false)}>Cancelar</button><button className="button button-danger" onClick={reset}>Sim, restaurar</button></div>}</div></section></div></>}
+function HistoryPage({state,notice}){const [query,setQuery]=useState('');const list=[...state.winners].reverse().filter(w=>normalize(w.participantName+' '+w.prizeName).includes(normalize(query)));const exportFile=()=>{if(!state.winners.length){notice('Ainda não há resultados para exportar.');return}downloadText('gpv-sorteios-2026-resultados.csv',toCSV([['Ganhador','Prêmio','Data e hora','Operador','Tentativa'],...state.winners.map(w=>[w.participantName,w.prizeName,formatTime(w.createdAt),w.operator,w.attempt])]))};return <><PageHeader eyebrow="REGISTRO DAS CONQUISTAS" title={<>Histórico de <em>ganhadores.</em></>} description="Cada premiação, um momento para lembrar. Consulte os resultados confirmados."><button className="button button-outline" onClick={exportFile}><Download size={17}/> Exportar CSV</button></PageHeader><div className="history-banner"><div className="history-banner-icon"><PartyPopper size={25}/></div><div><strong>{state.winners.length} {state.winners.length===1?'pessoa premiada':'pessoas premiadas'}</strong><span>Resultados registrados no Firebase</span></div></div><section className="surface-card data-card"><div className="data-tools"><div className="search-box"><Search size={18}/><input placeholder="Pesquisar ganhador ou prêmio..." value={query} onChange={e=>setQuery(e.target.value)}/></div></div><div className="table-scroll"><table className="data-table"><thead><tr><th>GANHADOR</th><th>PRÊMIO</th><th>DATA E HORA</th><th>TENTATIVA</th><th>STATUS</th></tr></thead><tbody>{list.map(w=><tr key={w.id}><td><strong>{w.participantName}</strong></td><td className="muted">{w.prizeName}</td><td className="muted">{formatTime(w.createdAt)}</td><td className="muted">{w.attempt}</td><td><span className="status-pill green">Confirmado</span></td></tr>)}</tbody></table>{!list.length&&<div className="empty-table">Nenhum resultado confirmado até agora.</div>}</div><div className="table-bottom">{list.length} resultado(s) encontrado(s)</div></section></>}
+function Preferences({state}){const exportBackup=()=>downloadText('gpv-sorteios-2026-backup.json',JSON.stringify(state,null,2),'application/json');return <><PageHeader eyebrow="PREFERÊNCIAS DA APLICAÇÃO" title={<>Configurações<span className="gold-period">.</span></>} description="Estado da integração Firebase e exportação dos registros."/><div className="settings-stack"><section className="surface-card settings-section"><div className="settings-icon"><ShieldCheck size={22}/></div><div><h3>Versão 0.2.0 · Firebase</h3><p>Dados sincronizados em tempo real entre operador e telão. Sorteios e confirmações são processados no servidor.</p><div className="info-chips"><span>React + Vite</span><span>Vercel Functions</span><span>Firebase Auth</span><span>Cloud Firestore</span></div></div></section><section className="surface-card settings-section"><div className="settings-icon"><Download size={22}/></div><div><h3>Backup do evento</h3><p>Exporte uma cópia dos dados para arquivamento. Não há restauração ou limpeza automática de sorteios.</p><button className="button button-outline" onClick={exportBackup}><Download size={16}/> Exportar JSON</button></div></section></div></>}
 function Telon({state,selected,prize,onExit}){const [tick,setTick]=useState(0);const [fullscreen,setFullscreen]=useState(false);const live=state.live;const spinning=live.phase==='spinning';useEffect(()=>{if(!spinning)return;const int=setInterval(()=>setTick(x=>x+1),75);return()=>clearInterval(int)},[spinning]);
- const scrolling=state.participants.filter(p=>p.active&&!state.winners.some(w=>w.participantId===p.id)&&!live.exclusions.includes(p.id));const names=scrolling.length?scrolling.map(p=>p.name):['GPV ASSOCIADOS'];const name=names[tick%names.length];const goFull=()=>{if(!document.fullscreenElement){document.documentElement.requestFullscreen?.().catch(()=>{});setFullscreen(true)}else{document.exitFullscreen?.().catch(()=>{});setFullscreen(false)}};
+ const names=['GPV ASSOCIADOS','BOA SORTE!','CONFRATERNIZAÇÃO','SORTEIOS ESPECIAIS','2026'];const name=names[tick%names.length];const goFull=()=>{if(!document.fullscreenElement){document.documentElement.requestFullscreen?.().catch(()=>{});setFullscreen(true)}else{document.exitFullscreen?.().catch(()=>{});setFullscreen(false)}};
  return <div className={'telao phase-'+live.phase}><div className="telao-halo halo-left"/><div className="telao-halo halo-right"/><div className="beam beam-a"/><div className="beam beam-b"/><div className="particles">{Array.from({length:24},(_,i)=><span key={i} style={{'--i':i,'--left':`${(i*43.79)%100}%`}}/>)}</div>
  <div className="screen-top"><div className="tel-logo"><div className="tel-logo-mark">GPV</div><span>ASSOCIADOS</span></div><div className="screen-title">CONFRATERNIZAÇÃO <strong>2026</strong><span>SORTEIOS ESPECIAIS</span></div><div className="screen-top-right"><span className="screen-line"/>UMA NOITE PARA CELEBRAR</div></div>
  <div className="tel-center"><div className="tel-eyebrow"><span className="tel-eyebrow-line"/> GPV ASSOCIADOS APRESENTA <span className="tel-eyebrow-line"/></div>
@@ -154,6 +167,6 @@ function Telon({state,selected,prize,onExit}){const [tick,setTick]=useState(0);c
  {live.phase==='confirmed'&&<><div className="celebrate-rays"/><div className="tel-caption">A NOITE TEM MAIS UMA CONQUISTA!</div><h1 className="tel-huge smaller">TEMOS UM <i>GANHADOR!</i></h1><div className="winner-frame confirmed-frame"><div className="winner-spark"><PartyPopper size={35}/></div><strong>{selected?.name||'Parabéns!'}</strong><span>PARABÉNS!</span></div><div className="validation-badge success"><CheckCircle2 size={20}/> PRESENÇA CONFIRMADA · PRÊMIO GARANTIDO</div></>}
  </div>
  <div className="tel-bottom"><div className="bottom-prize"><span>✦</span><div><small>PRÊMIO</small><strong>{prize?.name||'GPV Sorteios 2026'}</strong></div></div><div className="bottom-center"><span/><span/><span/></div><div className="bottom-number">GPV <strong>2026</strong></div></div>
- <div className="telao-utilities"><button title="Tela cheia" onClick={goFull}><Maximize2 size={19}/></button><button title="Voltar ao painel" onClick={onExit}><ExternalLink size={19}/></button></div><div className="telao-demo">DEMONSTRAÇÃO · SEM FIREBASE</div></div>
+ <div className="telao-utilities"><button title="Tela cheia" onClick={goFull}><Maximize2 size={19}/></button><button title="Voltar ao painel" onClick={onExit}><ExternalLink size={19}/></button></div><div className="telao-demo">GPV SORTEIOS · AO VIVO</div></div>
 }
 createRoot(document.getElementById('root')).render(<App/>);
