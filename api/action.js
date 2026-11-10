@@ -10,12 +10,12 @@ function firebaseAdmin(){
  }
  return admin;
 }
-const allowedActions=new Set(['init','setParticipants','setPrizes','select','draw','reveal','reject','confirm','finish']);
+const allowedActions=new Set(['init','setParticipants','setPrizes','select','draw','reveal','reject','confirm','finish','resetTests']);
 const empty=()=>({participants:[],prizes:[],winners:[],live:{phase:'idle',prizeId:'',candidateId:null,exclusions:[],attempt:0,startedAt:null},updatedAt:0});
 const publicScreen=s=>{
  const p=s.prizes.find(p=>p.id===s.live.prizeId);
  const selected=s.live.phase==='candidate'||s.live.phase==='confirmed'?s.participants.find(p=>p.id===s.live.candidateId):null;
- return {phase:s.live.phase,startedAt:s.live.startedAt||null,prize:p?{name:p.name,emoji:p.emoji||'🎁'}:null,candidate:selected?{name:selected.name,sector:selected.sector||''}:null,attempt:s.live.attempt,updatedAt:s.updatedAt};
+ return {phase:s.live.phase,startedAt:s.live.startedAt||null,prize:p?{name:p.name,emoji:p.emoji||'🎁'}:null,candidate:selected?{name:selected.name,sector:selected.sector||'',visualProfile:selected.visualProfile||'neutro',artUrl:selected.artUrl||''}:null,attempt:s.live.attempt,updatedAt:s.updatedAt};
 };
 const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase().replace(/\s+/g,' ');
 const fail=message=>{throw Error(message)};
@@ -24,6 +24,8 @@ function validateParticipants(incoming,old){
  const winnerIds=new Set(old.winners.map(w=>w.participantId)), seenId=new Set(), seenCodes=new Set(),seenNames=new Set();
  const oldMap=new Map(old.participants.map(p=>[p.id,p]));
  for(const p of incoming){
+  if(p.artUrl!==undefined&&(typeof p.artUrl!=='string'||p.artUrl.length>600||Boolean(p.artUrl)&&!/^https:\/\/[^\s]+$/i.test(p.artUrl)))fail('URL da arte inválida. Utilize um link HTTPS público.');
+  if(p.visualProfile!==undefined&&!['masculino','feminino','neutro'].includes(p.visualProfile))fail('Perfil visual inválido.');
   if(typeof p.id!=='string'||p.id.length>100||!p.id||typeof p.name!=='string'||!p.name.trim()||p.name.length>180||typeof p.code!=='string'||p.code.length>100||typeof p.sector!=='string'||p.sector.length>120||typeof p.active!=='boolean')fail('Dados de participantes inválidos.');
   if(seenId.has(p.id))fail('ID duplicado.');seenId.add(p.id);
   if(p.code.trim()){const code=norm(p.code);if(seenCodes.has(code))fail('Matrícula duplicada.');seenCodes.add(code)}
@@ -33,7 +35,7 @@ function validateParticipants(incoming,old){
  for(const id of winnerIds)if(!seenId.has(id))fail('Não é permitido excluir ganhadores.');
  if(old.live.phase!=='idle'&&old.live.phase!=='confirmed')fail('Não edite participantes durante um sorteio.');
  if(old.live.candidateId&&!seenId.has(old.live.candidateId))fail('Participante relacionado ao sorteio atual.');
- return incoming.map(p=>({id:p.id,name:p.name.trim(),code:p.code.trim(),sector:p.sector.trim(),active:p.active}));
+ return incoming.map(p=>({id:p.id,name:p.name.trim(),code:p.code.trim(),sector:p.sector.trim(),active:p.active,visualProfile:p.visualProfile||'neutro',artUrl:p.artUrl||''}));
 }
 function validatePrizes(incoming,old){
  if(!Array.isArray(incoming)||incoming.length>500)fail('Limite de 500 prêmios.');
@@ -50,6 +52,13 @@ function validatePrizes(incoming,old){
 }
 function apply(s,type,payload,uid){
  const phase=s.live.phase;
+ if(type==='resetTests'){
+  if(payload.confirmation!=='REINICIAR TESTES')fail('Digite REINICIAR TESTES para confirmar.');
+  if(phase==='spinning'||phase==='candidate')fail('Conclua ou marque ausência antes de reiniciar os testes.');
+  s.winners=[];
+  s.live={phase:'idle',prizeId:'',candidateId:null,exclusions:[],attempt:0,startedAt:null};
+  return s;
+ }
  if(type==='setParticipants'){s.participants=validateParticipants(payload.participants,s);return s}
  if(type==='setPrizes'){s.prizes=validatePrizes(payload.prizes,s);if(!s.prizes.some(p=>p.id===s.live.prizeId)&&phase==='idle')s.live.prizeId='';return s}
  if(type==='select'){
@@ -112,10 +121,15 @@ export default async function handler(req,res){
     tx.set(adminRef,{active:true,role:'admin',email:decoded.email||'',updatedAt:Date.now()},{merge:true});return;
    }
    if(!previous.exists)fail('Inicialize o evento antes de operar.');
+   if(type==='resetTests'&&payload.confirmation==='REINICIAR TESTES'){
+    if(s.live.phase==='spinning'||s.live.phase==='candidate')fail('Conclua ou marque ausência antes de reiniciar os testes.');
+    const archiveRef=db.doc(`events/${event}/resetArchives/${randomUUID()}`);
+    tx.set(archiveRef,{state:structuredClone(s),archivedAt:Date.now(),operator:decoded.uid,reason:'Reinicialização manual de testes'});
+   }
    s=apply(structuredClone(s),type,payload,decoded.uid);
    s.updatedAt=Date.now();
    tx.set(stateRef,s);tx.set(screenRef,publicScreen(s));
   });
   return res.status(200).json({ok:true});
- }catch(err){console.error('GPV API:',err.message);const safe=/não |Nenhum |Nenhuma |Prêmio |Participante |Selecione |Já |Finalize |Dados |Limite |ID |Matrícula |Nome |Quantidade |A animação |Confirme |Evento |Ação |Usuário |Faça |Inicialize |Não há |Não edite /.test(err.message);return res.status(safe?400:500).json({error:safe?err.message:'Falha na operação. Verifique as variáveis de ambiente e os logs da Vercel.'});}
+ }catch(err){console.error('GPV API:',err.message);const safe=/não |Nenhum |Nenhuma |Prêmio |Participante |Selecione |Já |Finalize |Dados |Limite |ID |Matrícula |Nome |Quantidade |A animação |Confirme |Evento |Ação |Usuário |Faça |Inicialize |Não há |Não edite |Digite |Conclua /.test(err.message);return res.status(safe?400:500).json({error:safe?err.message:'Falha na operação. Verifique as variáveis de ambiente e os logs da Vercel.'});}
 }

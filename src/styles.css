@@ -58,3 +58,40 @@
 
 .gladiator-idle-hero{height:min(64vh,620px);object-fit:cover;object-position:center}
 .gladiator-confirmed-art img{height:min(64vh,620px);object-fit:cover;object-position:center}
+
+/* v0.3.1 — revelação imediata e seleção de arte no sorteio */
+.visual-pending .gladiator-confirmed-art{animation:gpvRevealArt .85s ease-out both}
+.visual-pending .gladiator-confirmed-copy{animation:gpvRevealText .7s .15s ease-out both}
+.visual-confirmed .gladiator-confirmed-copy p{color:#7ef3b1}
+.visual-pending .gladiator-confirmed-copy p{color:#ffe084;letter-spacing:1.1px;font-size:clamp(11px,.95vw,16px)}
+.gladiator-confirmed-art{width:100%;height:min(62vh,620px);background:#100e0b}
+.gladiator-confirmed-art img{width:100%;height:100%;max-height:none;object-fit:cover;object-position:center}
+.gladiator-confirmed-copy h1{font-size:clamp(30px,4.0vw,75px)}
+.demo-profile-select{background:#292d33;color:#ffda6b;border:1px solid #78632d;border-radius:7px;padding:7px 8px;font-size:11px;font-weight:700}
+@keyframes gpvRevealArt{from{opacity:0;transform:translateX(-20px) scale(.96)}to{opacity:1;transform:translateX(0) scale(1)}}
+@keyframes gpvRevealText{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:900px){.gladiator-confirmed-art{height:min(36vh,380px)}}
+@media(prefers-reduced-motion:reduce){.visual-pending .gladiator-confirmed-art,.visual-pending .gladiator-confirmed-copy{animation:none}}
+
+
+/* V0.3.2 — Matrizes OFICIAIS aprovadas. PNGs intactos, nome sobreposto como texto acessível. */
+.gladiator-screen:has(.official-reveal) .screen-top,
+.gladiator-screen:has(.official-reveal) .tel-bottom {display:none}
+.gladiator-screen:has(.official-reveal) {padding:0;background:#050505}
+.gladiator-screen:has(.official-reveal) .tel-center {position:static;padding:0;max-width:none;width:100%;height:100%}
+.gladiator-screen:has(.official-reveal) .telao-halo,
+.gladiator-screen:has(.official-reveal) .beam,
+.gladiator-screen:has(.official-reveal) .particles {display:none}
+.official-reveal{position:absolute;inset:0;display:flex;justify-content:center;align-items:center;overflow:hidden;background:#050505;z-index:4;animation:gpvRevealArt .65s ease-out both}
+.official-reveal-frame{position:relative;width:min(100vw,177.6833156vh);max-height:100vh;aspect-ratio:1672 / 941;container-type:inline-size;flex:none;overflow:hidden;background:#070605}
+.official-reveal-image{display:block;width:100%;height:100%;object-fit:contain}
+.official-reveal-name{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;color:#101012;font:900 clamp(13px,3.05cqw,53px)/1.06 Montserrat,Inter,Arial,sans-serif;text-transform:uppercase;overflow:hidden;overflow-wrap:anywhere;letter-spacing:-.045em;padding:0 1.1%;}
+.official-reveal-name span{display:block;width:100%;max-height:100%;overflow:hidden;text-wrap:balance}
+.official-male .official-reveal-name{left:48.8%;top:56.7%;width:44.0%;height:13.4%;background:transparent}
+/* The female image already contains a sample caption; mask ONLY the letters inside the yellow plaque. */
+.official-female .official-reveal-name{left:50.25%;top:55.3%;width:41.5%;height:12.9%;border-radius:8px;background:linear-gradient(180deg,#ffd041 0%,#ffcf38 52%,#ffcb2b 100%)}
+.official-reveal-status{position:absolute;left:47.5%;bottom:2.0%;width:47%;text-align:center;font:800 clamp(8px,1.15cqw,22px)/1.15 Inter,Arial,sans-serif;letter-spacing:.08em;border-radius:7px;padding:.55% .65%;background:#090909d9;border:1px solid #b18d3385;color:#ffe49d;text-shadow:0 1px 3px #000}
+.official-reveal-status.prize-confirmed{color:#aaf2be;border-color:#368755b0}
+.gladiator-screen:has(.official-reveal) .telao-utilities{z-index:15}
+@media (max-width:700px){.official-reveal-status{letter-spacing:0}.official-reveal-name{font-size:clamp(10px,3cqw,40px)}}
+@media(prefers-reduced-motion:reduce){.official-reveal{animation:none}}
