@@ -79,7 +79,7 @@ function App(){
    <div className="brand"><div className="brand-mark">G<span>✦</span></div><div><strong>GPV<span> SORTEIOS</span></strong><small>CONFRATERNIZAÇÃO 2026</small></div></div>
    <div className="side-caption">MENU PRINCIPAL</div>
    <nav>{links.map(([href,Icon,label])=><button key={href} className={'nav-link '+(route===href?'active':'')} onClick={()=>navigate(href)}><Icon size={18}/><span>{label}</span>{route===href&&<span className="active-dot"/>}</button>)}</nav>
-   <div className="sidebar-bottom"><div className="side-promo"><Sparkles size={20}/><strong>É tempo de celebrar.</strong><span>Grandes momentos merecem grandes premiações.</span></div><div className="side-footer"><span className="status-dot"/> Firebase conectado <span>v0.3.3</span></div></div>
+   <div className="sidebar-bottom"><div className="side-promo"><Sparkles size={20}/><strong>É tempo de celebrar.</strong><span>Grandes momentos merecem grandes premiações.</span></div><div className="side-footer"><span className="status-dot"/> Firebase conectado <span>v0.3.4</span></div></div>
   </aside>
   <div className="main-side"><header className="topbar"><div className="top-left"><button className="icon-button mobile-menu" onClick={()=>setSidebar(true)}><Menu size={20}/></button><div className="breadcrumb">GPV Sorteios <ChevronRight size={14}/><strong>{links.find(l=>l[0]===route)?.[2]||'Dashboard'}</strong></div></div><div className="header-actions"><span className="demo-indicator"><span className="status-dot"/> FIREBASE AO VIVO</span><button className="button button-outline tel-btn" onClick={()=>window.open('/telao','_blank')}><Monitor size={16}/> Abrir telão <ExternalLink size={14}/></button><button className="icon-button" title="Sair" onClick={()=>signOut(auth)}><LogOut size={18}/></button><div className="avatar">GP</div></div></header>
    <main className="page">
@@ -90,7 +90,7 @@ function App(){
     {route==='/admin/historico'&&<HistoryPage {...common}/>}
     {route==='/admin/configuracoes'&&<Preferences {...common} action={action}/>}
     {!links.some(l=>l[0]===route)&&route!=='/'&&<Dashboard {...common} stats={stats}/>}
-   </main><footer className="app-footer">GPV ASSOCIADOS <span>•</span> Sorteios 2026 <span>•</span> Firebase · v0.3.3</footer>
+   </main><footer className="app-footer">GPV ASSOCIADOS <span>•</span> Sorteios 2026 <span>•</span> Firebase · v0.3.4</footer>
   </div>{toast&&<div className="toast"><Info size={17}/>{toast}<button onClick={()=>setToast('')}><X size={15}/></button></div>}
  </div>;
 }
@@ -178,6 +178,32 @@ function Preferences({state,action,notice}){
  {resetOpen&&<div className="modal-shade" onMouseDown={e=>{if(e.target===e.currentTarget&&!resetBusy)setResetOpen(false)}}><div className="modal" role="dialog" aria-modal="true" aria-label="Reiniciar testes"><div className="modal-header"><div><h3>Reiniciar todos os testes?</h3><p>Esta ação remove os resultados ativos deste evento e libera todos os participantes para sortear novamente. Os prêmios e participantes serão mantidos. Um arquivo de auditoria será salvo no Firestore.</p></div><button className="icon-button" disabled={resetBusy} onClick={()=>setResetOpen(false)}><X size={18}/></button></div><label className="field full">Digite <strong>REINICIAR TESTES</strong> para confirmar<input value={resetText} onChange={e=>setResetText(e.target.value)} autoComplete="off" placeholder="REINICIAR TESTES"/></label><div className="modal-actions"><button className="button button-outline" disabled={resetBusy} onClick={()=>setResetOpen(false)}>Cancelar</button><button className="button button-danger" disabled={resetBusy||resetText!=='REINICIAR TESTES'} onClick={reset}>{resetBusy?'Reiniciando...':'Confirmar reinício'}</button></div></div></div>}
  </>;
 }
+// Standalone visual test: entirely local; never calls the protected Firebase API.
+function DemoTelon({onExit}){
+ const [phase,setPhase]=useState('idle');
+ const [profile,setProfile]=useState('feminino');
+ const [startedAt,setStartedAt]=useState(0);
+ const candidate={name:profile==='feminino'?'PARTICIPANTE DEMONSTRAÇÃO':'PARTICIPANTE DEMONSTRAÇÃO',visualProfile:profile};
+ useEffect(()=>{if(phase!=='spinning')return;
+   const id=setTimeout(()=>setPhase('candidate'),12100);
+   return()=>clearTimeout(id);
+ },[phase,startedAt]);
+ const begin=()=>{setStartedAt(Date.now());setPhase('spinning')};
+ const live={phase,prizeId:'demo',candidateId:phase==='candidate'||phase==='confirmed'?'demo':null,startedAt,exclusions:[],attempt:1};
+ return <div className="gpv-demo-shell">
+  <Telon state={{participants:[],winners:[],live}} selected={candidate} prize={{id:'demo',name:'Prêmio de demonstração',emoji:'🏆'}} onExit={onExit}/>
+  <div className="gpv-demo-controls" role="group" aria-label="Controles do teste visual">
+    <strong>TESTE VISUAL · SEM REGISTRO NO FIRESTORE</strong>
+    <div className="gpv-demo-buttons">
+     <select aria-label="Perfil de teste" value={profile} onChange={e=>setProfile(e.target.value)} disabled={phase==='spinning'}><option value="feminino">Gladiadora</option><option value="masculino">Gladiador</option></select>
+     <button onClick={begin} disabled={phase==='spinning'}>{phase==='idle'?'INICIAR TESTE':'TESTAR NOVAMENTE'}</button>
+     {phase==='candidate'&&<button onClick={()=>setPhase('confirmed')}>SIMULAR PRESENÇA</button>}
+     {phase==='candidate'&&<button onClick={begin}>AUSENTE · GIRAR DE NOVO</button>}
+     <button onClick={()=>setPhase('idle')}>STANDBY</button>
+    </div>
+  </div>
+ </div>;
+}
 // The approved master images are served unchanged. Text and status are independent HTML overlays.
 function OfficialWinnerArtwork({participant,phase,prize}){
  const feminine=visualOf(participant)==='feminino';
@@ -205,13 +231,13 @@ function Telon({state,selected,prize,onExit}){
  const countdown=Math.max(0,Math.ceil((10000-elapsed)/1000));
  useEffect(()=>{['/assets/matriz-gladiador-oficial.png','/assets/matriz-gladiadora-oficial.png'].forEach(src=>{const img=new Image();img.src=src})},[]);
  const goFull=()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.().catch(()=>{});else document.exitFullscreen?.().catch(()=>{})};
- return <div className={'telao gladiator-screen phase-'+live.phase}>
+ return <div className={'telao gladiator-screen phase-'+live.phase+(live.phase==='idle'?' standby-screen':'')}>
   <div className="telao-halo halo-left"/><div className="telao-halo halo-right"/>
   <div className="beam beam-a"/><div className="beam beam-b"/>
   <div className="particles">{Array.from({length:24},(_,i)=><span key={i} style={{'--i':i,'--left':`${(i*43.79)%100}%`}}/>)}</div>
   <div className="screen-top"><div className="tel-logo"><img src="/assets/gpv-symbol.png" alt="Símbolo GPV"/><span>GPV ASSOCIADOS</span></div><div className="screen-title">CONFRATERNIZAÇÃO <strong>2026</strong><span>GPV SORTEIOS · GLADIADOR DA VEZ</span></div><div className="screen-top-right"><span className="screen-line"/> UMA NOITE PARA CELEBRAR</div></div>
   <div className="tel-center gladiator-center">
-   {live.phase==='idle'&&<div className="gladiator-idle"><img className="gladiator-idle-hero" src="/assets/gladiador-ilustrativo.jpg" alt="Gladiador GPV"/><div className="gladiator-idle-copy"><span className="gpv-gala-eyebrow">A GRANDE PREMIAÇÃO</span><h1>O GLADIADOR<br/><em>DA VEZ É...</em></h1><p>Prepare-se para descobrir o próximo premiado!</p><div className="gladiator-prize-label">{prize?.emoji||'🏆'} {prize?.name||'Aguardando o próximo prêmio'}</div></div></div>}
+   {live.phase==='idle'&&<div className="gpv-standby" aria-label="GPV Sorteios: Em instantes, começaremos os sorteios!"><img className="gpv-standby-animation" src="/assets/gladiador-standby-animado.gif" alt="Gladiador GPV animado aguardando os sorteios"/></div>}
    {spinning&&<div className="gladiator-animation"><div className="gladiator-visual" key={pickingBall?'outro':'loop'}><img src={pickingBall?'/assets/gladiador-bola-final.gif':'/assets/gladiador-globo-loop.gif'} alt={pickingBall?'Gladiador retirando a bola da sorte':'Gladiador girando o globo da sorte'}/></div><div className="gladiator-status"><span className="gpv-gala-eyebrow">{pickingBall?'O MOMENTO CHEGOU':'BOA SORTE A TODOS!'}</span><h1>{pickingBall?'A BOLA DA':'O GLOBO ESTÁ'}<em>{pickingBall?' SORTE!':' GIRANDO...'}</em></h1><p>{pickingBall?'O gladiador está revelando o sorteado!':'O próximo gladiador está sendo escolhido...'}</p><div className="gladiator-countdown">{pickingBall?<><Sparkles size={23}/> REVELANDO...</>:<><span>{countdown}</span><small>SEGUNDOS</small></>}</div></div></div>}
    {(live.phase==='candidate'||live.phase==='confirmed')&&<OfficialWinnerArtwork participant={selected} phase={live.phase} prize={prize}/>}
   </div>
