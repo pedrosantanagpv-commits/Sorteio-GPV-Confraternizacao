@@ -69,7 +69,7 @@ function apply(s,type,payload,uid){
  }
  if(type==='reveal'){
   if(phase!=='spinning')fail('Não há sorteio em animação.');
-  if(Date.now()-(s.live.startedAt||0)<4400)fail('A animação ainda está em andamento.');
+  if(Date.now()-(s.live.startedAt||0)<11800)fail('A animação ainda está em andamento.');
   s.live.phase='candidate';return s;
  }
  if(type==='reject'){

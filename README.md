@@ -76,3 +76,14 @@ Faça login com a conta criada no Firebase Authentication. No primeiro login aut
 - As configurações públicas do Firebase Web não são segredo, mas a conta de serviço **é**.
 - É preciso verificar os termos e os limites do plano Vercel atual antes do uso comercial/corporativo em produção.
 - **Validação local:** sintaxe JSX e módulos do servidor verificados. A instalação de dependências e o `vite build` não puderam ser concluídos no ambiente de preparação; valide o build no deploy e não use para sorteio oficial antes de passar nos testes acima.
+
+
+## V0.3.0 — Teste visual Gladiador GPV
+
+- Para testar sem registrar nada, abra **`/telao?demo=1`** após publicar, ou use o botão **TESTAR ANIMAÇÃO** na página Sorteio ao vivo.
+- Clique em **INICIAR TESTE**: o globo roda em loop por **10 segundos**, em seguida toca a animação curta de retirada da bola por aproximadamente **2 segundos**; aparece um **participante fictício**, e o botão **SIMULAR CONFIRMAÇÃO** exibe o estado final.
+- O teste roda **somente no navegador** e não altera participantes, premiações, sorteios nem Firestore.
+- A animação do giro e a de retirada são GIFs separados para permitir repetição sem retirar a bola cedo. São prévias em resolução reduzida; a fluidez/qualidade final do telão poderá ser aprimorada com vídeos maiores.
+- No sorteio real, o servidor aguarda ~12 segundos antes de revelar o candidato, para cobrir as duas animações. Atualize também o arquivo `api/action.js`.
+- A arte final é ilustrativa com um rosto genérico: **a substituição pela foto do colaborador ainda não está implementada**. Não representa o vencedor real.
+- **Importante:** V0.3.0 preserva as configurações e as regras Firestore da V0.2.0.

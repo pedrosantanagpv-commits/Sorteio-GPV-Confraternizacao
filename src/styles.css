@@ -13,3 +13,48 @@
 .login-box p{color:#a4a5b0;font-size:14px;line-height:1.6}.login-box label{font-size:12px;color:#ddd;font-weight:700;display:grid;gap:8px}
 .login-box input{background:#101115;border:1px solid #464750;border-radius:8px;padding:14px;color:white;font-size:15px;outline:none}.login-box input:focus{border-color:#f6c632}
 .login-box .button{justify-content:center;margin-top:10px}.login-error{background:#501b20;color:#ffb7be!important;padding:12px;border-radius:8px;word-break:break-word}
+
+/* GPV SORTEIOS 0.3.0 — TELÕO GLADIADOR */
+.raffle-head-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.gladiator-screen{background:radial-gradient(ellipse at 43% 44%,#30200c 0%,#100f12 55%,#050508 100%)}
+.gladiator-screen .tel-logo img{width:clamp(40px,4vw,68px);height:clamp(40px,4vw,68px);object-fit:contain;border-radius:10px}
+.gladiator-screen .tel-logo{gap:4px}
+.gladiator-screen .tel-logo span{font-size:clamp(8px,.73vw,13px);letter-spacing:1.5px}
+.gladiator-center{width:100%;max-width:1600px;margin:auto;min-height:0;padding:0}
+.gladiator-animation,.gladiator-idle,.gladiator-confirmed{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,4vw,75px);align-items:center;width:100%;min-height:0}
+.gladiator-visual{width:100%;min-height:0;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 5px 55px #ecb12522)}
+.gladiator-visual img{height:auto;width:min(100%,640px);max-height:65vh;object-fit:contain;border-radius:12px}
+.gladiator-status,.gladiator-idle-copy,.gladiator-confirmed-copy{text-align:left}
+.gpv-gala-eyebrow{font-weight:800;letter-spacing:clamp(2px,.3vw,5px);color:#f2c43d;font-size:clamp(10px,1vw,17px)}
+.gladiator-status h1,.gladiator-idle h1,.gladiator-confirmed h1,.gladiator-revealed h1{font:900 clamp(32px,4.6vw,90px)/1.09 Montserrat,Inter,sans-serif;margin:20px 0;text-transform:uppercase;letter-spacing:-.035em;color:#f5f1e5}
+.gladiator-status h1 em,.gladiator-idle h1 em,.gladiator-confirmed h1 em,.gladiator-revealed h1 em{color:#ffcf31;font-style:normal;display:block}
+.gladiator-status p,.gladiator-idle p{font-size:clamp(13px,1.2vw,22px);color:#c3b8a0;line-height:1.65}
+.gladiator-countdown{margin-top:26px;display:flex;align-items:center;gap:14px;color:#ffd44e;letter-spacing:2px;font-weight:800;text-shadow:0 0 34px #ffcc3930}
+.gladiator-countdown span{font:900 clamp(48px,6vw,96px) Montserrat,Inter,sans-serif;font-variant-numeric:tabular-nums}
+.gladiator-countdown small{font-size:12px}
+.gladiator-idle-hero{width:100%;max-height:65vh;object-fit:cover;object-position:left center;border-radius:12px;mask-image:linear-gradient(90deg,#000 72%,transparent)}
+.gladiator-prize-label{display:inline-flex;max-width:100%;padding:15px 23px;background:#30240b;border:1px solid #92702e;border-radius:9px;color:#ffe4a4;font-weight:800;margin-top:15px}
+.gladiator-revealed{width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.gladiator-revealed h1{font-size:clamp(28px,4vw,70px)}
+.gladiator-nameplate{font:900 clamp(24px,4vw,76px)/1.15 Montserrat,Inter,sans-serif;letter-spacing:-1px;background:linear-gradient(140deg,#ffe277,#f7b91e);color:#12100b;padding:clamp(15px,2.2vw,32px) clamp(20px,3vw,65px);border:2px solid #ffe79d;border-radius:10px;box-shadow:0 0 60px #ffd03742;max-width:min(95%,1100px);overflow-wrap:anywhere;text-align:center}
+.gladiator-revealed p{letter-spacing:3px;font-weight:800;color:#f5d77b;font-size:clamp(11px,1vw,17px);margin:25px 0 15px}
+.gladiator-secondary{color:#bbb5a4;letter-spacing:1px}
+.gladiator-confirmed-art{position:relative;max-height:65vh;overflow:hidden;border-radius:10px;mask-image:linear-gradient(90deg,#000 75%,transparent)}
+.gladiator-confirmed-art img{width:100%;max-height:65vh;object-fit:cover;object-position:left center}
+.gladiator-photo-pending{position:absolute;bottom:9px;left:9px;background:#141414d9;color:#ffdc86;padding:6px 8px;border:1px solid #785c19;font-size:9px;letter-spacing:1px}
+.gladiator-confirmed-copy .gladiator-nameplate{font-size:clamp(24px,3.4vw,60px);padding:clamp(12px,2vw,22px)}
+.gladiator-confirmed-copy p{display:flex;gap:9px;align-items:center;color:#f9cf58;font-weight:800;letter-spacing:2px;margin-top:22px}
+.demo-stage{width:100%;height:100dvh;position:relative}
+.demo-operator{position:fixed;z-index:90;bottom:65px;right:24px;width:min(455px,calc(100vw - 36px));border:1px solid #c9a23875;border-radius:11px;background:#111215ef;color:#eee;padding:14px 16px;box-shadow:0 20px 60px #000b;backdrop-filter:blur(14px)}
+.demo-operator-title{font-weight:800;color:#ffdf77;font-size:11px;letter-spacing:1.2px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.demo-buttonline{display:flex;gap:8px;flex-wrap:wrap}
+.demo-buttonline button{background:#f5c532;border:0;border-radius:7px;color:#1d1708;font-weight:800;padding:10px 11px;display:flex;gap:5px;align-items:center;font-size:11px;cursor:pointer}
+.demo-buttonline button:disabled{opacity:.5;cursor:default}
+.demo-buttonline .demo-success{background:#4bda87}
+.demo-buttonline .demo-neutral{background:#292d33;color:#fff;border:1px solid #56565b}
+.demo-operator small{color:#b5ab8c;display:block;margin-top:9px;font-size:10px}
+@media(max-width:900px){.gladiator-animation,.gladiator-idle,.gladiator-confirmed{grid-template-columns:1fr;gap:8px;justify-items:center;text-align:center}.gladiator-status,.gladiator-idle-copy,.gladiator-confirmed-copy{text-align:center}.gladiator-status h1,.gladiator-idle h1,.gladiator-confirmed h1{font-size:clamp(27px,6vw,65px);margin:8px 0}.gladiator-visual img,.gladiator-idle-hero,.gladiator-confirmed-art{max-height:36vh;width:min(100%,450px)}.gladiator-countdown{justify-content:center}.gladiator-confirmed-copy p{justify-content:center}.gladiator-idle-hero{object-fit:contain}.gladiator-screen{height:100dvh}.gladiator-center{padding:10px 0}.gladiator-revealed h1{font-size:clamp(25px,5.8vw,50px)}}
+@media(max-height:650px){.gladiator-visual img,.gladiator-idle-hero,.gladiator-confirmed-art{max-height:50vh}.gladiator-screen{padding:14px 32px}.gladiator-status h1{font-size:clamp(27px,3.8vw,65px)}.gladiator-countdown{margin-top:8px}}
+
+.gladiator-idle-hero{height:min(64vh,620px);object-fit:cover;object-position:center}
+.gladiator-confirmed-art img{height:min(64vh,620px);object-fit:cover;object-position:center}
