@@ -121,3 +121,26 @@
 .gpv-demo-buttons button,.gpv-demo-buttons select{border:1px solid #8d7648;color:#ffe8aa;background:#25221c;padding:8px 10px;border-radius:6px;cursor:pointer;font:700 11px Inter,Arial,sans-serif}
 .gpv-demo-buttons button:first-of-type{background:#f4c536;border-color:#f4c536;color:#12100b}
 .gpv-demo-buttons button:disabled,.gpv-demo-buttons select:disabled{opacity:.45;cursor:not-allowed}
+
+/* V0.3.5 - anúncio do prêmio e upload */
+.prize-image {width:100%;height:100%;object-fit:contain;max-height:156px;border-radius:12px}
+.selected-emoji img{width:76px;height:76px;object-fit:contain;border-radius:10px}
+.prize-upload-drop{display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;border:1px dashed rgba(249,194,40,.65);border-radius:12px;background:rgba(249,194,40,.07);min-height:88px;color:#f8c733;text-align:center;padding:12px}
+.prize-upload-drop input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.prize-upload-preview{display:flex;align-items:center;gap:14px;margin-top:10px;flex-wrap:wrap}
+.prize-upload-preview img{width:130px;height:100px;object-fit:contain;border-radius:10px;background:#0b0c10}
+.prize-upload-field small{display:block;color:#a4a5aa;margin-top:8px}
+.announced-actions{display:grid;gap:12px}.announced-note{display:flex;align-items:center;gap:10px;color:#f8ce55;font-size:13px;line-height:1.4}
+.preview-prize-image{width:90px;height:74px;object-fit:contain}
+.gpv-prize-announcement{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:4%;align-items:center;width:100%;height:100%;min-height:0;padding:3% 4%;animation:gpvPrizeEnter .7s ease-out both}
+.gpv-announcement-visual{height:min(58vh,570px);min-height:210px;display:flex;align-items:center;justify-content:center;border-radius:24px;border:1px solid rgba(251,191,36,.36);background:radial-gradient(circle,rgba(255,184,12,.21),rgba(20,12,5,.3) 65%,rgba(5,5,8,.45));box-shadow:inset 0 0 75px rgba(255,188,28,.11),0 20px 50px rgba(0,0,0,.25);overflow:hidden}
+.gpv-announcement-visual img{width:92%;height:90%;object-fit:contain;filter:drop-shadow(0 12px 27px rgba(255,194,45,.32))}
+.gpv-announcement-visual span{font-size:clamp(80px,18vw,230px);filter:drop-shadow(0 0 30px rgba(255,194,45,.45))}
+.gpv-announcement-copy{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:clamp(12px,2vh,25px);min-width:0;text-align:left}
+.gpv-announcement-copy h1{font-size:clamp(32px,4.2vw,76px);line-height:1.04;color:#fff9ed;font-weight:900;margin:0;letter-spacing:-.03em;text-shadow:0 0 30px rgba(255,204,63,.12)}
+.gpv-announcement-copy h1 em{display:block;color:#ffca34;font-style:normal}
+.gpv-announcement-name{font-size:clamp(23px,3vw,58px);font-weight:900;color:#12100c;background:linear-gradient(130deg,#ffe17d,#ffc322,#e8a414);border:2px solid #ffe282;box-shadow:0 0 38px rgba(255,194,33,.28);border-radius:14px;padding:clamp(12px,1.7vw,28px) clamp(14px,2vw,30px);width:100%;line-height:1.16;overflow-wrap:anywhere}
+.gpv-announcement-copy p{font-size:clamp(15px,1.5vw,22px);color:#ddd1b6;margin:0}
+.gpv-announcement-copy strong{font-size:clamp(12px,1.3vw,20px);letter-spacing:.13em;color:#ffcf59}
+@keyframes gpvPrizeEnter{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media (max-width:800px){.gpv-prize-announcement{gap:12px;grid-template-columns:1fr;grid-template-rows:43% 1fr;padding:4%}.gpv-announcement-visual{min-height:0;height:100%}.gpv-announcement-copy{align-items:center;text-align:center;gap:10px}.gpv-announcement-copy h1{font-size:clamp(20px,5vw,40px)}.gpv-announcement-name{font-size:clamp(16px,4vw,28px)}.gpv-announcement-copy strong{font-size:10px}}

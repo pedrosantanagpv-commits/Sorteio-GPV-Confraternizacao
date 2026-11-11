@@ -1,35 +1,51 @@
-# GPV Sorteios — V0.3.4 (standby animado e faixa feminina)
+# GPV Sorteios — V0.3.5 | Anúncio dos Prêmios
 
-Esta versão preserva o visual e as matrizes oficiais da V0.3.2 e adiciona, em **Configurações → Reiniciar testes**, uma operação protegida por login administrativo e confirmação digitada `REINICIAR TESTES`.
+Atualização incremental sobre a V0.3.4. Preserva Firebase Authentication, Firestore, API de sorteios, as matrizes oficiais do Gladiador/Gladiadora e a animação de standby aprovada.
 
-A reinicialização remove o histórico de ganhadores do evento ativo e limpa o sorteio em andamento, mas **mantém todos os participantes e prêmios**. Os vencedores anteriores voltam a ser elegíveis. Antes da limpeza, o servidor salva um snapshot em `events/{EVENT_ID}/resetArchives/{id}`, acessível a administradores via Firebase Admin SDK. Não é recomendável executar depois de iniciar a premiação oficial.
+## Novidades
 
-## Instalação
+- **Anunciar prêmio no telão:** após selecionar um prêmio no painel, o operador aciona o botão `ANUNCIAR PRÊMIO NO TELÃO`. O servidor grava o novo estado `announced` no Firestore, e a tela pública exibe o nome, a foto e a descrição do prêmio. A tela permanece nesse estado até o operador clicar em `INICIAR SORTEIO`.
+- **Sorteio sincronizado:** a função `draw` exige que o prêmio tenha sido anunciado. Em seguida são mantidos os 10 segundos de giro + retirada da bola + revelação do participante e validação de presença.
+- **Ausência:** ao marcar um participante ausente, o telão retorna ao anúncio do mesmo prêmio; ele fica excluído das tentativas seguintes desse prêmio, mas permanece elegível aos outros.
+- **Imagem do prêmio:** cadastro e edição aceitam upload de JPG/PNG/WebP com até **5 MB**, mostram prévia e permitem remover o vínculo. A imagem fica hospedada no Cloudinary, e apenas a URL pública é registrada no documento do Firestore. O nome e o emoji continuam como fallback.
+- **Modo de demonstração:** `/telao?demo=1` oferece um botão de anúncio, depois o giro, com dados fictícios e sem registro no banco.
+- **Reiniciar testes:** a função da V0.3.3 foi preservada.
 
-1. Extraia o ZIP e envie o conteúdo à raiz do repositório GitHub já vinculado à Vercel.
-2. Não adicione arquivos JSON de contas de serviço ao GitHub. As variáveis Firebase/Vercel atuais permanecem válidas.
-3. Aguarde o deploy automático e verifique **Configurações → Reiniciar testes**.
-4. Antes de reiniciar, use **Exportar JSON** para ter um backup local adicional.
-5. Confirme a expressão exata **REINICIAR TESTES** na janela de confirmação.
+## Configuração obrigatória para o upload
 
-## Atenção
+O Firebase Storage **não está disponível no plano Spark**; esta versão usa Cloudinary com assinatura de upload calculada na API Vercel após autenticar o UID administrador. Não é necessário alterar o plano do Firebase.
 
-O reinício afeta o evento identificado por `EVENT_ID` na Vercel. A operação deve ser usada somente enquanto os registros forem de teste. A versão não cria um ambiente de homologação separado; recomendamos separá-lo antes do evento oficial.
+1. Crie uma conta Cloudinary e acesse **Dashboard / API Keys**.
+2. Na Vercel → Projeto → **Settings → Environment Variables**, adicione estas variáveis no ambiente Production:
 
-Sem necessidade de alterar as regras Firestore: a operação de arquivamento e reinicialização é feita pelo servidor usando Firebase Admin SDK após validar o UID autorizado.
+   - `CLOUDINARY_CLOUD_NAME` = seu Cloud name
+   - `CLOUDINARY_API_KEY` = API Key
+   - `CLOUDINARY_API_SECRET` = API Secret (secreta!)
 
-## Novidades na V0.3.4
+3. Mantenha todas as variáveis Firebase já cadastradas, incluindo `GPV_ADMIN_UID`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `EVENT_ID` e `VITE_EVENT_ID`.
+4. Faça o **redeploy** depois de cadastrar as variáveis. Não envie a API Secret ou o JSON do Firebase ao GitHub.
+5. Cadastre um prêmio em **Prêmios → Adicionar prêmio**, selecione uma imagem e aguarde a prévia. Clique **Salvar prêmio**. Depois vá a **Sorteio ao vivo → Anunciar prêmio no telão**.
 
-- **Standby animado:** `/telao` apresenta o GIF cartunesco aprovado, com a frase “Em instantes, começaremos os sorteios!”, em loop infinito, apenas quando o evento estiver em `idle`. Não antecipa as imagens dos premiados.
-- **Faixa feminina corrigida pelo CSS:** a sobreposição anterior foi substituída por uma placa oval com as mesmas dimensões da matriz, ocultando a legenda fixa sem criar a tarja retangular interna. A matriz PNG original permanece inalterada.
-- **Sorteio oficial mantido:** giro de 10 segundos, retirada da bola, revelação, validação de presença e reinício dos testes continuam conforme a versão anterior.
-- Sem mudanças em credenciais Firebase, regras Firestore ou endpoints administrativos.
+**Sem as três variáveis Cloudinary**, o restante do sistema continua funcionando, inclusive anúncio sem foto, mas o upload mostrará erro de configuração.
 
-## Teste rápido
+Uploads são assinados pelo backend `/api/upload-sign`, que exige Firebase ID token válido e UID igual a `GPV_ADMIN_UID`. Os arquivos sobem diretamente do navegador para o Cloudinary; o segredo não é enviado ao frontend. O upload tem uma validação de tipo/tamanho no navegador, e o Cloudinary aceita apenas arquivos de imagem nesse endpoint. Não coloque fotografias pessoais sensíveis em recursos públicos sem autorização. A exclusão ou troca de uma foto no cadastro **não remove automaticamente o arquivo antigo do Cloudinary**.
 
-1. Abra `/telao` quando o estado do evento estiver aguardando (idle) para verificar o standby animado.
-2. Use `/telao?demo=1` para testar a animação sem alterar o Firestore.
-3. Faça sorteios fictícios com perfis masculino e feminino e confira o nome na placa amarela.
-4. Após `Finalizar sorteio`, o standby volta automaticamente.
+## Deploy
 
-**Nota:** o GIF aprovado tem resolução original de 553×307, portanto a qualidade em um telão grande é limitada pela origem; este pacote o inclui intacto para teste.
+1. Extraia o ZIP e substitua os arquivos na raiz do repositório `Sorteio-GPV-Confraternizacao`.
+2. Faça commit na branch `main` e acompanhe o novo deploy na Vercel.
+3. No Firebase **não é necessário editar regras Firestore**, pois toda escrita de prêmio e mudança de estado é feita pela função protegida `/api/action`.
+4. Teste em dois dispositivos: `/admin/sorteio` e `/telao`. Abra os dois antes de clicar em `ANUNCIAR PRÊMIO NO TELÃO`.
+
+## Testes sugeridos
+
+- Selecionar um prêmio sem imagem e anunciar: aparece o emoji, nome e descrição.
+- Enviar JPG/PNG/WebP e anunciar: a imagem deve aparecer em ambos os dispositivos.
+- Iniciar sorteio: globo de 10 segundos, retirada da bola, revelação automática (Gladiador ou Gladiadora).
+- Marcar ausência: volta ao anúncio; repetir giro sem repetir a pessoa ausente.
+- Confirmar: salva um único resultado e impede novo prêmio para o mesmo participante.
+- Concluir e preparar o próximo: volta ao standby animado.
+
+## Validação
+
+Sintaxe da API verificada com `node --check`, sintaxe JSX verificada com o parser TypeScript e arquivos ZIP íntegros. O build completo depende do `npm install`/`npm run build` na Vercel, pois a instalação não foi concluída neste ambiente. Testar primeiro com dados fictícios.

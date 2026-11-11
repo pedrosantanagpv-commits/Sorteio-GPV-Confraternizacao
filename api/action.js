@@ -10,12 +10,12 @@ function firebaseAdmin(){
  }
  return admin;
 }
-const allowedActions=new Set(['init','setParticipants','setPrizes','select','draw','reveal','reject','confirm','finish','resetTests']);
+const allowedActions=new Set(['init','setParticipants','setPrizes','select','announce','draw','reveal','reject','confirm','finish','resetTests']);
 const empty=()=>({participants:[],prizes:[],winners:[],live:{phase:'idle',prizeId:'',candidateId:null,exclusions:[],attempt:0,startedAt:null},updatedAt:0});
 const publicScreen=s=>{
  const p=s.prizes.find(p=>p.id===s.live.prizeId);
  const selected=s.live.phase==='candidate'||s.live.phase==='confirmed'?s.participants.find(p=>p.id===s.live.candidateId):null;
- return {phase:s.live.phase,startedAt:s.live.startedAt||null,prize:p?{name:p.name,emoji:p.emoji||'🎁'}:null,candidate:selected?{name:selected.name,sector:selected.sector||'',visualProfile:selected.visualProfile||'neutro',artUrl:selected.artUrl||''}:null,attempt:s.live.attempt,updatedAt:s.updatedAt};
+ return {phase:s.live.phase,startedAt:s.live.startedAt||null,prize:p?{name:p.name,description:p.description||'',emoji:p.emoji||'🎁',imageUrl:p.imageUrl||''}:null,candidate:selected?{name:selected.name,sector:selected.sector||'',visualProfile:selected.visualProfile||'neutro',artUrl:selected.artUrl||''}:null,attempt:s.live.attempt,updatedAt:s.updatedAt};
 };
 const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase().replace(/\s+/g,' ');
 const fail=message=>{throw Error(message)};
@@ -41,6 +41,7 @@ function validatePrizes(incoming,old){
  if(!Array.isArray(incoming)||incoming.length>500)fail('Limite de 500 prêmios.');
  const ids=new Set();
  for(const p of incoming){
+  if(p.imageUrl!==undefined&&(typeof p.imageUrl!=='string'||p.imageUrl.length>800||Boolean(p.imageUrl)&&!/^https:\/\/res\.cloudinary\.com\/[a-zA-Z0-9_-]+\/image\/upload\//.test(p.imageUrl)))fail('Imagem do prêmio inválida. Faça o upload autorizado.');
   if(typeof p.id!=='string'||!p.id||p.id.length>100||typeof p.name!=='string'||!p.name.trim()||p.name.length>160||typeof p.description!=='string'||p.description.length>500||typeof p.emoji!=='string'||p.emoji.length>30||!Number.isInteger(p.quantity)||p.quantity<1||p.quantity>10000||typeof p.active!=='boolean')fail('Dados de prêmio inválidos.');
   if(ids.has(p.id))fail('ID de prêmio duplicado.');ids.add(p.id);
   const won=old.winners.filter(w=>w.prizeId===p.id).length;
@@ -48,7 +49,7 @@ function validatePrizes(incoming,old){
  }
  for(const w of old.winners)if(!ids.has(w.prizeId))fail('Não exclua prêmios já sorteados.');
  if(old.live.phase!=='idle'&&old.live.phase!=='confirmed')fail('Não edite prêmios durante um sorteio.');
- return incoming.map(p=>({id:p.id,name:p.name.trim(),description:p.description.trim(),quantity:p.quantity,emoji:p.emoji,active:p.active}));
+ return incoming.map(p=>({id:p.id,name:p.name.trim(),description:p.description.trim(),quantity:p.quantity,emoji:p.emoji,active:p.active,imageUrl:p.imageUrl||''}));
 }
 function apply(s,type,payload,uid){
  const phase=s.live.phase;
@@ -66,8 +67,14 @@ function apply(s,type,payload,uid){
   if(payload.id&&!s.prizes.some(p=>p.id===payload.id&&p.active&&s.winners.filter(w=>w.prizeId===p.id).length<p.quantity))fail('Prêmio indisponível.');
   s.live={phase:'idle',prizeId:payload.id||'',candidateId:null,exclusions:[],attempt:0,startedAt:null};return s;
  }
+ if(type==='announce'){
+  if(phase!=='idle'&&phase!=='announced')fail('Finalize o sorteio atual antes de anunciar o prêmio.');
+  const prize=s.prizes.find(p=>p.id===s.live.prizeId);
+  if(!prize||!prize.active||s.winners.filter(w=>w.prizeId===prize.id).length>=prize.quantity)fail('Selecione um prêmio disponível.');
+  s.live.phase='announced';return s;
+ }
  if(type==='draw'){
-  if(phase!=='idle')fail('Já existe um sorteio em andamento.');
+  if(phase!=='announced')fail('Anuncie o prêmio no telão antes de iniciar o sorteio.');
   const prize=s.prizes.find(p=>p.id===s.live.prizeId);
   if(!prize||!prize.active||s.winners.filter(w=>w.prizeId===prize.id).length>=prize.quantity)fail('Selecione um prêmio disponível.');
   const won=new Set(s.winners.map(w=>w.participantId));const excluded=new Set(s.live.exclusions);
@@ -83,7 +90,7 @@ function apply(s,type,payload,uid){
  }
  if(type==='reject'){
   if(phase!=='candidate')fail('Nenhum candidato aguardando presença.');
-  s.live={...s.live,phase:'idle',candidateId:null,startedAt:null,exclusions:[...new Set([...s.live.exclusions,s.live.candidateId])]};return s;
+  s.live={...s.live,phase:'announced',candidateId:null,startedAt:null,exclusions:[...new Set([...s.live.exclusions,s.live.candidateId])]};return s;
  }
  if(type==='confirm'){
   if(phase!=='candidate')fail('Nenhum candidato aguardando presença.');
