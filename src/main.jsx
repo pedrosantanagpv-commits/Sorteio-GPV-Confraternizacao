@@ -80,7 +80,7 @@ function App(){
    <div className="brand"><div className="brand-mark">G<span>✦</span></div><div><strong>GPV<span> SORTEIOS</span></strong><small>CONFRATERNIZAÇÃO 2026</small></div></div>
    <div className="side-caption">MENU PRINCIPAL</div>
    <nav>{links.map(([href,Icon,label])=><button key={href} className={'nav-link '+(route===href?'active':'')} onClick={()=>navigate(href)}><Icon size={18}/><span>{label}</span>{route===href&&<span className="active-dot"/>}</button>)}</nav>
-   <div className="sidebar-bottom"><div className="side-promo"><Sparkles size={20}/><strong>É tempo de celebrar.</strong><span>Grandes momentos merecem grandes premiações.</span></div><div className="side-footer"><span className="status-dot"/> Firebase conectado <span>v0.3.6</span></div></div>
+   <div className="sidebar-bottom"><div className="side-promo"><Sparkles size={20}/><strong>É tempo de celebrar.</strong><span>Grandes momentos merecem grandes premiações.</span></div><div className="side-footer"><span className="status-dot"/> Firebase conectado <span>v0.3.7</span></div></div>
   </aside>
   <div className="main-side"><header className="topbar"><div className="top-left"><button className="icon-button mobile-menu" onClick={()=>setSidebar(true)}><Menu size={20}/></button><div className="breadcrumb">GPV Sorteios <ChevronRight size={14}/><strong>{links.find(l=>l[0]===route)?.[2]||'Dashboard'}</strong></div></div><div className="header-actions"><span className="demo-indicator"><span className="status-dot"/> FIREBASE AO VIVO</span><button className="button button-outline tel-btn" onClick={()=>window.open('/telao','_blank')}><Monitor size={16}/> Abrir telão <ExternalLink size={14}/></button><button className="icon-button" title="Sair" onClick={()=>signOut(auth)}><LogOut size={18}/></button><div className="avatar">GP</div></div></header>
    <main className="page">
@@ -91,7 +91,7 @@ function App(){
     {route==='/admin/historico'&&<HistoryPage {...common}/>}
     {route==='/admin/configuracoes'&&<Preferences {...common} action={action}/>}
     {!links.some(l=>l[0]===route)&&route!=='/'&&<Dashboard {...common} stats={stats}/>}
-   </main><footer className="app-footer">GPV ASSOCIADOS <span>•</span> Sorteios 2026 <span>•</span> Firebase · v0.3.6</footer>
+   </main><footer className="app-footer">GPV ASSOCIADOS <span>•</span> Sorteios 2026 <span>•</span> Firebase · v0.3.7</footer>
   </div>{toast&&<div className="toast"><Info size={17}/>{toast}<button onClick={()=>setToast('')}><X size={15}/></button></div>}
  </div>;
 }
@@ -246,11 +246,12 @@ function OfficialWinnerArtwork({participant,phase,prize}){
  const master=feminine?'/assets/matriz-gladiadora-oficial.png':'/assets/matriz-gladiador-oficial.png';
  const custom=participant?.artUrl&&/^https:\/\//i.test(participant.artUrl)?participant.artUrl:null;
  const [failed,setFailed]=useState(false);
+ const showingCustom=Boolean(custom&&!failed);
  useEffect(()=>setFailed(false),[custom]);
  return <div className={'official-reveal '+(feminine?'official-female':'official-male')}>
   <div className="official-reveal-frame">
-   <img className="official-reveal-image" src={custom&&!failed?custom:master} onError={()=>setFailed(true)} alt={feminine?'Arte oficial da Gladiadora GPV':'Arte oficial do Gladiador GPV'}/>
-   <div className="official-reveal-name" aria-label={'Participante sorteado: '+(participant?.name||'Participante')}><span>{participant?.name||'PARTICIPANTE'}</span></div>
+   <img className="official-reveal-image" src={showingCustom?custom:master} onError={()=>setFailed(true)} alt={feminine?'Arte oficial da Gladiadora GPV':'Arte oficial do Gladiador GPV'}/>
+   {!showingCustom&&<div className="official-reveal-name" aria-label={'Participante sorteado: '+(participant?.name||'Participante')}><span>{participant?.name||'PARTICIPANTE'}</span></div>}
    <div className={'official-reveal-status '+(phase==='confirmed'?'prize-confirmed':'prize-pending')}>
     {phase==='confirmed'?'✓ PRÊMIO CONFIRMADO':'AGUARDANDO VALIDAÇÃO DE PRESENÇA · PRÊMIO AINDA NÃO CONFIRMADO'}
    </div>
