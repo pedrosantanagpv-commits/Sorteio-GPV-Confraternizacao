@@ -1,4 +1,4 @@
-# GPV Sorteios — V0.3.7
+# GPV Sorteios — V0.3.8
 
 **Base:** V0.3.5 — todos os recursos existentes de sorteio e telão preservados.
 
@@ -16,9 +16,16 @@ O telão já utiliza `artUrl` e exibe automaticamente a arte do participante sor
 
 Substitua o conteúdo do repositório GitHub pelos arquivos deste ZIP, faça commit e aguarde o deploy da Vercel. Faça um teste com um participante antes de cadastrar as demais artes; confirme no telão que a imagem correta aparece após o sorteio.
 
-## V0.3.7 — Correção de nomes sobrepostos
+## V0.3.8 — Correção de nomes sobrepostos
 
 - Arte personalizada (`artUrl`) carregada: a imagem aparece integralmente **sem sobreposição de nome**.
 - Sem arte personalizada ou com falha no carregamento: mantém a matriz oficial e insere o nome do participante automaticamente.
 - Mensagem de validação/confirmacão de presença preservada.
 - Nenhuma alteração nas regras de sorteio, Firebase, Cloudinary ou animações.
+
+
+## v0.3.8 — Correção do texto no telão
+- O nome do vencedor sem arte personalizada é renderizado uma única vez em SVG, centralizado na faixa, sem espaçamento negativo.
+- Nomes compridos recebem fonte ajustada e podem ocupar duas linhas.
+- As artes personalizadas com nome impresso continuam sem sobreposição.
+- O funcionamento do sorteio e a validação de presença permanecem os mesmos.

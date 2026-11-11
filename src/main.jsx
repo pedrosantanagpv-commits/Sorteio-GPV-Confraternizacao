@@ -240,6 +240,25 @@ function DemoTelon({onExit}){
   </div>
  </div>;
 }
+// Renders the winner name only once, as SVG text that stays centered without tight/negative letter spacing.
+function WinnerName({name}){
+ const full=String(name||'PARTICIPANTE').trim().replace(/\s+/g,' ').toLocaleUpperCase('pt-BR');
+ let lines=[full];
+ if(full.length>27){
+  const words=full.split(' ');let best=1,score=Infinity;
+  for(let i=1;i<words.length;i++){
+   const a=words.slice(0,i).join(' '),b=words.slice(i).join(' ');
+   const cost=Math.max(a.length,b.length)*2+Math.abs(a.length-b.length);
+   if(cost<score){score=cost;best=i}
+  }
+  if(words.length>1)lines=[words.slice(0,best).join(' '),words.slice(best).join(' ')];
+ }
+ const longest=Math.max(...lines.map(x=>x.length));
+ const fontSize=Math.max(32,Math.min(lines.length>1?61:70,1320/(longest+2)));
+ return <svg className="official-reveal-name-svg" viewBox="0 0 1000 170" preserveAspectRatio="xMidYMid meet" role="img" aria-label={'Participante sorteado: '+full}>
+  {lines.map((line,i)=><text key={i} x="500" y={lines.length===1?88:i===0?55:125} textAnchor="middle" dominantBaseline="middle" fontSize={fontSize} fontWeight="900" letterSpacing="0" fill="#101012" fontFamily="Montserrat, Inter, Arial, sans-serif">{line}</text>)}
+ </svg>;
+}
 // The approved master images are served unchanged. Text and status are independent HTML overlays.
 function OfficialWinnerArtwork({participant,phase,prize}){
  const feminine=visualOf(participant)==='feminino';
@@ -251,7 +270,7 @@ function OfficialWinnerArtwork({participant,phase,prize}){
  return <div className={'official-reveal '+(feminine?'official-female':'official-male')}>
   <div className="official-reveal-frame">
    <img className="official-reveal-image" src={showingCustom?custom:master} onError={()=>setFailed(true)} alt={feminine?'Arte oficial da Gladiadora GPV':'Arte oficial do Gladiador GPV'}/>
-   {!showingCustom&&<div className="official-reveal-name" aria-label={'Participante sorteado: '+(participant?.name||'Participante')}><span>{participant?.name||'PARTICIPANTE'}</span></div>}
+   {!showingCustom&&<div className="official-reveal-name" aria-label={'Participante sorteado: '+(participant?.name||'Participante')}><WinnerName name={participant?.name}/></div>}
    <div className={'official-reveal-status '+(phase==='confirmed'?'prize-confirmed':'prize-pending')}>
     {phase==='confirmed'?'✓ PRÊMIO CONFIRMADO':'AGUARDANDO VALIDAÇÃO DE PRESENÇA · PRÊMIO AINDA NÃO CONFIRMADO'}
    </div>
