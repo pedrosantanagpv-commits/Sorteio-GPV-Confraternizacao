@@ -21,10 +21,12 @@ export default async function handler(req,res){
   const apiKey=process.env.CLOUDINARY_API_KEY;
   const secret=process.env.CLOUDINARY_API_SECRET;
   if(!cloudName||!apiKey||!secret)return res.status(503).json({error:'Configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY e CLOUDINARY_API_SECRET na Vercel.'});
+  const kind=req.body?.kind==='participante'?'participantes':req.body?.kind===undefined||req.body?.kind==='premio'?'premios':null;
+  if(!kind)return res.status(400).json({error:'Categoria de upload inválida.'});
   const event=process.env.EVENT_ID||'2026';
-  const folder=`gpv-sorteios/${event}/premios`;
+  const folder=`gpv-sorteios/${event}/${kind}`;
   const timestamp=Math.floor(Date.now()/1000);
-  const public_id=`premio_${randomUUID().replace(/-/g,'')}`;
+  const public_id=`${kind==='participantes'?'participante':'premio'}_${randomUUID().replace(/-/g,'')}`;
   const signature=createHash('sha1').update(`folder=${folder}&public_id=${public_id}&timestamp=${timestamp}${secret}`).digest('hex');
   return res.status(200).json({cloud_name:cloudName,api_key:apiKey,folder,public_id,timestamp,signature});
  }catch(err){console.error('Erro na assinatura do upload:',err.message);return res.status(500).json({error:'Não foi possível autorizar o upload.'});}

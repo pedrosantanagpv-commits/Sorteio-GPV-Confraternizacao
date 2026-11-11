@@ -144,3 +144,8 @@
 .gpv-announcement-copy strong{font-size:clamp(12px,1.3vw,20px);letter-spacing:.13em;color:#ffcf59}
 @keyframes gpvPrizeEnter{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media (max-width:800px){.gpv-prize-announcement{gap:12px;grid-template-columns:1fr;grid-template-rows:43% 1fr;padding:4%}.gpv-announcement-visual{min-height:0;height:100%}.gpv-announcement-copy{align-items:center;text-align:center;gap:10px}.gpv-announcement-copy h1{font-size:clamp(20px,5vw,40px)}.gpv-announcement-name{font-size:clamp(16px,4vw,28px)}.gpv-announcement-copy strong{font-size:10px}}
+
+/* V0.3.6 — prévia de artes personalizadas dos participantes */
+.person-art-cell{display:flex;align-items:center;gap:10px;min-width:140px;font-size:10px}
+.person-art-cell img,.person-art-empty{width:56px;height:37px;object-fit:cover;border-radius:5px;background:#29271e;border:1px solid #625027;display:grid;place-items:center;color:var(--gold);flex-shrink:0}
+.person-art-cell span:last-child{color:#a7a9b0}
